@@ -1,0 +1,136 @@
+--- # Installing Cassandra on Single Server (Stage Installation - Final Playbook)
+- hosts: '{{ target }}'
+  remote_user: ubuntu
+  become: yes
+  become_method: sudo
+  connection: ssh
+  gather_facts: yes
+  tasks:
+# Instructions on how to run: ansible-playbook cassandra-cluster-install.yaml -e "target=$server_ip clusterName=NameofYourCluster cluster_ips=10.0.0.1,10.0.0.2,10.0.0.3 enviro=NameOFtheEnvironmentForKeyspace"
+# For cluster_ips you would enter the IPs of the servers you are trying to cluster
+# SSH in to the first server, restart cassandra and check if it is clustered with 'nodetool status' command
+
+# If cassandra has username and password, you can run it as 'cqlsh -u username -p password -f /file/with/commands'
+
+  - name: Add Java Repo 
+    shell: "add-apt-repository ppa:webupd8team/java -y"
+
+  - name: Update all packages to the latest version
+    shell: "apt-get -y update"
+
+# Accept oracle license
+
+  - name: Accepting Oracle license 1
+    shell: "echo debconf shared/accepted-oracle-license-v1-1 select true | sudo debconf-set-selections"
+
+  - name: Accepting Oracle License 2
+    shell: "echo debconf shared/accepted-oracle-license-v1-1 seen true | sudo debconf-set-selections"
+
+  - name: Install Java8
+    shell: "apt-get -y install oracle-java8-set-default"
+
+# Install Cassandra
+
+  - name: Add Cassandra Repository 
+    shell: "echo 'deb http://debian.datastax.com/community stable main' | sudo tee -a /etc/apt/sources.list.d/cassandra.sources.list"
+
+  - name: Add Secondary Cassandra Repository 
+    shell: "echo 'deb-src http://www.apache.org/dist/cassandra/debian 22x main' | sudo tee -a /etc/apt/sources.list.d/cassandra.sources.list"
+
+  - name: Add Keys
+    shell: "wget http://debian.datastax.com/debian/repo_key"
+  - name: Adding Keys
+    shell: "apt-key add repo_key"
+
+  - name: Add Additional Keys That Are Needed
+    shell: "curl https://www.apache.org/dist/cassandra/KEYS | apt-key add -"
+
+  - name: Update Packages One More Time
+    shell: "apt-get -y update"
+  - name: Install Cassandra
+    shell: "apt-get -y install dsc22=2.2.3-1 cassandra=2.2.3"
+# Required sleep command. This command is must in this playbook, otherwise, your cassandra installation will fail.
+  - name: Wait two minutes
+    shell: "sleep 150" 
+# Configuring Ansible files
+  - name: Editing listen_address value inside cassandra config
+    shell: "sed -i '429s/localhost/''{{ target }}''/' /etc/cassandra/cassandra.yaml"
+  - name: Editing /etc/init.d/cassandra
+    shell: "sed -i 's/cassandra.+CassandraDaemon/cassandra/' /etc/init.d/cassandra"
+  - name: Setting rpc_address value to 0.0.0.0
+    shell: "sed -i '487s/localhost/0.0.0.0/' /etc/cassandra/cassandra.yaml"
+  - name: Uncommenting broadcast_rpc_address
+    shell: "sed -i '498s/^#//' /etc/cassandra/cassandra.yaml"
+  - name: Adding IP address to broadcast_rpc_address
+    shell: "sed -i '498s/1.2.3.4/''{{ target }}''/' /etc/cassandra/cassandra.yaml"
+  - name: Remove whitespace in front of broadcast_rpc_address
+    shell: "sed -i '498s/^ *//' /etc/cassandra/cassandra.yaml"
+# The following changes are specific only for clustering
+  - name: Sleep for ten seconds
+    shell: "sleep 10"
+
+  - name: Changing cluster name
+    shell: "sed -i 's/Test Cluster/''{{clusterName}}''/' /etc/cassandra/cassandra.yaml"
+  
+  - name: Setting Cluster IPs
+    shell: "sed -i '315s/127.0.0.1/''{{cluster_ips}}''/' /etc/cassandra/cassandra.yaml"
+
+  - name: Changing endpoint snitch value
+    shell: "sed -i 's/SimpleSnitch/GossipingPropertyFileSnitch/' /etc/cassandra/cassandra.yaml"
+
+  - name: Adding auto_bootstrap value as false
+    shell: 'echo "auto_bootstrap: false" >> /etc/cassandra/cassandra.yaml'
+
+# Updates system.local variable to cluster name that we specify
+
+  - name: Creating file with CQL command to update system.local clusterName
+    shell: echo "UPDATE system.local SET cluster_name = 'my_new_cluster' where key='local';" > /tmp/cql-cluster-name
+
+  - name: Change the cluster name inside the file for Cassandra
+    shell: "sed -i 's/my_new_cluster/''{{ clusterName }}''/' /tmp/cql-cluster-name"
+
+  - name: Run the CQLSH with -f option
+    shell: "cqlsh -f /tmp/cql-cluster-name"
+
+  - name: Sleep for five seconds
+    shell: "sleep 5"
+
+  - name: Nodetool flush
+    shell: "nodetool flush"
+
+  - name: Sleep for five
+    shell: "sleep 5"
+  
+  - name: Delete /tmp/cql-cluster-name file / Not needed now
+    shell: "rm -f /tmp/cql-cluster-name"
+
+# File needs to be placed under /home/ as /home/downstream.cql and /home/segment.cql inside target server
+# Make sure to inlcude MCLOL string and attach it to 'sg' inside segment.cql
+
+  - name: Copying downstream.cql file to target server
+    copy: src=/application_deploy/files/downstream.cql dest=/home/
+  - name: Copying over segment.cql file
+    copy: src=/application_deploy/files/segment.cql dest=/home/
+
+  - name: Wait 7 seconds and let the Ansible rest!
+    shell: "sleep 7"
+
+  - name: Edit downstream CQL file
+    shell: "sed -i 's/MCLOL/''{{enviro}}''/' /home/downstream.cql"
+
+  - name: Run the downstream file with CQL commands
+    shell: "cqlsh -f /home/downstream.cql"
+
+  - name: Edit segment CQL file
+    shell: "sed -i 's/MCLOL/''{{enviro}}''/' /home/segment.cql"
+
+  - name: Run segment CQL file
+    shell: "cqlsh -f /home/segment.cql"
+
+  - name: Nodetool Flush
+    shell: "nodetool flush"
+  
+  - name: Restart Cassandra
+    shell: "service cassandra restart"
+
+
