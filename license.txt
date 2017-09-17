@@ -1,0 +1,9 @@
+License for Cassandra Clustering With Ansible on Ubuntu 14/16
+1) The software and all the components of this repository are free.
+	a. No entity or individual has right to sell this repo and the playbooks for this Ansible project except by asking permission from the author.
+	b. The script and the all its components are Open Source and to promote Open Source software.
+
+2) The author is not obliged to anyone regarding the software nor its components. 
+	a. You can use it as you wish.
+	b. I am not responsible for any of your usages or issues.
+3) The script and the components are to be used only for the benefits of humanity in general. Cannot be used for anything that violates human rights.  
