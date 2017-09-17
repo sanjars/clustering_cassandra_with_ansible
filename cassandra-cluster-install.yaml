@@ -52,7 +52,7 @@
 # Required sleep command. This command is must in this playbook, otherwise, your cassandra installation will fail.
   - name: Wait two minutes
     shell: "sleep 150" 
-# Configuring Ansible files
+# Configuring Cassandra Config Files
   - name: Editing listen_address value inside cassandra config
     shell: "sed -i '429s/localhost/''{{ target }}''/' /etc/cassandra/cassandra.yaml"
   - name: Editing /etc/init.d/cassandra
@@ -103,29 +103,6 @@
   
   - name: Delete /tmp/cql-cluster-name file / Not needed now
     shell: "rm -f /tmp/cql-cluster-name"
-
-# File needs to be placed under /home/ as /home/downstream.cql and /home/segment.cql inside target server
-# Make sure to inlcude MCLOL string and attach it to 'sg' inside segment.cql
-
-  - name: Copying downstream.cql file to target server
-    copy: src=/application_deploy/files/downstream.cql dest=/home/
-  - name: Copying over segment.cql file
-    copy: src=/application_deploy/files/segment.cql dest=/home/
-
-  - name: Wait 7 seconds and let the Ansible rest!
-    shell: "sleep 7"
-
-  - name: Edit downstream CQL file
-    shell: "sed -i 's/MCLOL/''{{enviro}}''/' /home/downstream.cql"
-
-  - name: Run the downstream file with CQL commands
-    shell: "cqlsh -f /home/downstream.cql"
-
-  - name: Edit segment CQL file
-    shell: "sed -i 's/MCLOL/''{{enviro}}''/' /home/segment.cql"
-
-  - name: Run segment CQL file
-    shell: "cqlsh -f /home/segment.cql"
 
   - name: Nodetool Flush
     shell: "nodetool flush"

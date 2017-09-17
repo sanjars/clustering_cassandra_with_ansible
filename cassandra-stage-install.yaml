@@ -49,7 +49,7 @@
   - name: Wait two minutes and let the Ansible relax!
     shell: "sleep 150"
 
-# Configuring Ansible files
+# Configuring Cassandra Config Files
 
   - name: Editing listen_address value inside cassandra config
     shell: "sed -i '429s/localhost/''{{target}}''/' /etc/cassandra/cassandra.yaml"
@@ -68,29 +68,6 @@
   
   - name: Remove whitespace in front of broadcast_rpc_address
     shell: "sed -i '498s/^ *//' /etc/cassandra/cassandra.yaml"
-
-# File needs to be placed under /home/ as /home/downstream.cql and /home/segment.cql inside target server
-# Make sure to inlcude MCLOL string and attach it to 'sg' inside segment.cql
-
-  - name: Wait 7 seconds and let Ansible rest!
-    shell: "sleep 7"
-
-  - name: Copying downstream.cql file to target server
-    copy: src=/application_deploy/files/downstream.cql dest=/home/
-  - name: Copying over segment.cql file
-    copy: src=/application_deploy/files/segment.cql dest=/home/
-
-  - name: Edit downstream CQL file
-    shell: "sed -i 's/MCLOL/''{{enviro}}''/' /home/downstream.cql"
-
-  - name: Run the downstream file with CQL commands
-    shell: "cqlsh -f /home/downstream.cql"
-
-  - name: Edit segment CQL file
-    shell: "sed -i 's/MCLOL/''{{enviro}}''/' /home/segment.cql"
-
-  - name: Run segment CQL file
-    shell: "cqlsh -f /home/segment.cql"
 
   - name: Restart Cassandra
     shell: "service cassandra restart"
